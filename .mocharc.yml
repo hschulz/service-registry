@@ -1,0 +1,9 @@
+require:
+  - "ts-node/register"
+
+extension:
+  - "ts"
+
+reqursive: true
+
+reporter: "mocha-junit-reporter"

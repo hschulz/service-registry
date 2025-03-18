@@ -1,0 +1,14 @@
+### IDE ###
+nbproject/
+.vscode/
+.idea/
+
+### Node ###
+node_modules/
+
+### General ###
+*.log
+
+### Testing ###
+coverage/
+test-results.xml
