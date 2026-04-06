@@ -1,4 +1,4 @@
-import { ServiceState } from "./ServiceState"
+import { ServiceState } from "./ServiceState.js"
 
 /**
  * This is the interface for the service.

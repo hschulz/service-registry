@@ -1,5 +1,5 @@
 import { DAG } from "@hschulz/directed-acyclic-graph"
-import { ServiceInterface } from "./ServiceInterface"
+import { ServiceInterface } from "./ServiceInterface.js"
 
 /**
  * The ServiceRegistry class is a singleton that manages the lifecycle of services.
@@ -181,7 +181,9 @@ export class ServiceRegistry {
         .initialize()
         .then(() => {
 
-            this.dag.addNode(name)
+            if (!this.dag.getNode(name)) {
+                this.dag.addNode(name)
+            }
 
             /* Add the service to the registry */
             this.services.set(name, service)

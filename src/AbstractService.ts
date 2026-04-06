@@ -1,5 +1,5 @@
-import { ServiceInterface } from "./ServiceInterface"
-import { ServiceState } from "./ServiceState"
+import { ServiceInterface } from "./ServiceInterface.js"
+import { ServiceState } from "./ServiceState.js"
 
 /**
  * Abstract service class.
