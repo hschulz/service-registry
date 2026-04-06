@@ -1,16 +1,15 @@
-# Serivce Registry
+# Service Registry
 
-Service Registry is a library that provides a simple way to register
-and manage services in your application. It allows you to register services
-with a unique name and retrieve them later. This is useful for managing
-dependencies and ensuring that services are only instantiated once.
+A library for managing modular services with dependency resolution, lifecycle management, and topological ordering.
 
 ## Features
-- tbd
+
+- **Service lifecycle management** - initialize, start, stop, reload, and unload services
+- **Dependency resolution** - services declare dependencies and are started in the correct order via a DAG
+- **Singleton registry** - a single registry instance manages all services
+- **State tracking** - each service exposes its current state (`unknown`, `initializing`, `initialized`, `starting`, `started`, `stopping`, `stopped`, `reloading`, `unloading`, `unloaded`, `error`)
 
 ## Installation
-
-You can install the library in your project using npm:
 
 ```bash
 npm install @hschulz/service-registry
@@ -18,40 +17,97 @@ npm install @hschulz/service-registry
 
 ## Usage
 
-Create a new service class.
+Create a service by extending `AbstractService`:
 
 ```typescript
-// src/MyService.ts
+import { AbstractService } from "@hschulz/service-registry"
 
-import { AbstractService } from '@hschulz/service-registry'
-
-class MyService extends AbstractService {
+class DatabaseService extends AbstractService {
 
     protected override async _initialize(): Promise<void> {
-        console.log("MyService initialized")
+        // Set up connection pool
     }
 
     protected override async _start(): Promise<void> {
-        console.log("MyService started")
+        // Connect to database
+    }
+
+    protected override async _stop(): Promise<void> {
+        // Disconnect from database
     }
 }
 ```
 
-Register the service with the registry.
+Declare dependencies between services:
 
 ```typescript
-// src/index.ts
+class UserService extends AbstractService {
 
-import { ServiceRegistry } from '@hschulz/service-registry'
-import { MyService } from './MyService'
+    protected override _dependencies = [DatabaseService.name]
+
+    protected override async _start(): Promise<void> {
+        // DatabaseService is guaranteed to be started first
+    }
+}
+```
+
+Register and start all services:
+
+```typescript
+import { ServiceRegistry } from "@hschulz/service-registry"
 
 const registry = new ServiceRegistry()
 
-registry.register(new MyService())
+await registry.register(new DatabaseService())
+await registry.register(new UserService())
 
-registry.start()
+// Starts services in dependency order
+await registry.start()
+
+// Gracefully stop and unload all services
+await registry.shutdown()
 ```
+
+## API
+
+### `ServiceRegistry`
+
+| Method | Description |
+| --- | --- |
+| `static get instance` | Returns the singleton instance. |
+| `register(service)` | Initializes and registers a service. |
+| `registerAll(services)` | Registers multiple services. |
+| `start()` | Starts all services in dependency order. |
+| `stop()` | Stops all services in reverse dependency order. |
+| `reload()` | Reloads all services. |
+| `shutdown()` | Stops and unloads all services. |
+| `startService(name)` | Starts a single service by name. |
+| `stopService(name)` | Stops a single service by name. |
+| `reloadService(name)` | Reloads a single service by name. |
+| `unregister(name)` | Stops, unloads, and removes a service. |
+
+### `AbstractService`
+
+Extend this class and override the lifecycle hooks:
+
+| Method | Description |
+| --- | --- |
+| `_initialize()` | Called during registration. |
+| `_start()` | Called when the service is started. |
+| `_stop()` | Called when the service is stopped. |
+| `_unload()` | Called during unregistration. |
+
+Properties:
+
+| Property | Description |
+| --- | --- |
+| `state` | The current `ServiceState` of the service. |
+| `dependencies` | Array of service names this service depends on. |
+
+### `ServiceState`
+
+Enum of all possible service states: `Unknown`, `Initializing`, `Initialized`, `Unloading`, `Unloaded`, `Starting`, `Started`, `Stopping`, `Stopped`, `Reloading`, `Error`.
 
 ## License
+
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-```
