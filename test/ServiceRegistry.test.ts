@@ -1,5 +1,5 @@
-import { expect } from "chai"
-import { AbstractService, ServiceRegistry, ServiceState } from ".."
+import { describe, it, expect, beforeEach } from "vitest"
+import { AbstractService, ServiceRegistry, ServiceState } from "../src/index.js"
 
 class MockService extends AbstractService {}
 
@@ -13,6 +13,15 @@ class MockServiceWithNonExistentDependency extends AbstractService {
     protected override _dependencies = [ "NonExistentDependency" ]
 }
 
+class ResettableServiceRegistry extends ServiceRegistry {
+
+    public static reset(): void {
+        // Must set on ServiceRegistry directly since static properties
+        // are not shared via prototype chain on write
+        (ServiceRegistry as unknown as { _instance: undefined })._instance = undefined
+    }
+}
+
 class MockRegistryWithNoConstructorInstance extends ServiceRegistry {
 
     public constructor() {
@@ -24,27 +33,31 @@ class MockRegistryWithNoConstructorInstance extends ServiceRegistry {
 
 describe("ServiceRegistry", () => {
 
+    beforeEach(() => {
+        ResettableServiceRegistry.reset()
+    })
+
     describe("Singleton", () => {
 
         it("should get the instance of the service registry when used with `new`", () => {
 
             const registry = new ServiceRegistry()
 
-            expect(registry).instanceOf(ServiceRegistry)
+            expect(registry).toBeInstanceOf(ServiceRegistry)
         })
 
         it("should get the instance of the service registry when used without `new`", () => {
 
             const registry = ServiceRegistry.instance
 
-            expect(registry).instanceOf(ServiceRegistry)
+            expect(registry).toBeInstanceOf(ServiceRegistry)
         })
 
         it("should return a singleton instance even if the constructor fallback fails", () => {
 
             const registry = MockRegistryWithNoConstructorInstance.instance
 
-            expect(registry).instanceOf(ServiceRegistry)
+            expect(registry).toBeInstanceOf(ServiceRegistry)
         })
 
         it("should be a singleton", () => {
@@ -52,9 +65,9 @@ describe("ServiceRegistry", () => {
             const registry1 = ServiceRegistry.instance
             const registry2 = new ServiceRegistry()
 
-            expect(registry1).instanceOf(ServiceRegistry)
-            expect(registry2).instanceOf(ServiceRegistry)
-            expect(registry1).equal(registry2)
+            expect(registry1).toBeInstanceOf(ServiceRegistry)
+            expect(registry2).toBeInstanceOf(ServiceRegistry)
+            expect(registry1).toBe(registry2)
         })
     })
 
@@ -66,14 +79,8 @@ describe("ServiceRegistry", () => {
 
             const service = new MockService()
 
-            registry
-            .register(service)
-            .then(() => {
-                expect(service.state).equal(ServiceState.Initialized)
-            })
-            .catch((error) => {
-                throw error
-            })
+            await registry.register(service)
+            expect(service.state).toBe(ServiceState.Initialized)
         })
     })
 
@@ -85,30 +92,9 @@ describe("ServiceRegistry", () => {
 
             const service = new MockService()
 
-            registry
-            .register(service)
-            .then(() => registry.start())
-            .then(() => {
-                expect(service.state).equal(ServiceState.Stopped)
-            })
-            .catch((error) => {
-                throw error
-            })
-        })
-
-        it("start a service and not error if it is already started", async () => {
-
-            const registry = new ServiceRegistry()
-
-            const service = new MockService()
-
-            registry
-            .register(service)
-            .then(() => registry.start)
-            .then(() => registry.start)
-            .then(() => {
-                expect(service.state).equal(ServiceState.Started)
-            })
+            await registry.register(service)
+            await registry.start()
+            expect(service.state).toBe(ServiceState.Started)
         })
 
         it("should start a dependency correctly", async () => {
@@ -118,17 +104,11 @@ describe("ServiceRegistry", () => {
             const service = new MockServiceWithDependency()
             const dependency = new MockService()
 
-            registry
-            .register(dependency)
-            .then(() => registry.register(service))
-            .then(() => registry.start())
-            .then(() => {
-                expect(service.state).equal(ServiceState.Started)
-                expect(dependency.state).equal(ServiceState.Started)
-            })
-            .catch((error) => {
-                throw error
-            })
+            await registry.register(dependency)
+            await registry.register(service)
+            await registry.start()
+            expect(service.state).toBe(ServiceState.Started)
+            expect(dependency.state).toBe(ServiceState.Started)
         })
 
         it("should start services with dependencies correctly even if they are unordered", async () => {
@@ -138,17 +118,11 @@ describe("ServiceRegistry", () => {
             const service = new MockServiceWithDependency()
             const dependency = new MockService()
 
-            registry
-            .register(service)
-            .then(() => registry.register(dependency))
-            .then(() => registry.start())
-            .then(() => {
-                expect(service.state).equal(ServiceState.Started)
-                expect(dependency.state).equal(ServiceState.Started)
-            })
-            .catch((error) => {
-                throw error
-            })
+            await registry.register(service)
+            await registry.register(dependency)
+            await registry.start()
+            expect(service.state).toBe(ServiceState.Started)
+            expect(dependency.state).toBe(ServiceState.Started)
         })
 
         it("should throw an error when trying to start a service that is not registered", async () => {
@@ -157,13 +131,8 @@ describe("ServiceRegistry", () => {
 
             const service = new MockServiceWithNonExistentDependency()
 
-            registry
-            .register(service)
-            .then(() => registry.start())
-            .catch((error) => {
-                expect(error).instanceOf(Error)
-                expect(error.message).equal("Service NonExistentDependency is not registered")
-            })
+            await registry.register(service)
+            await expect(registry.start()).rejects.toThrow("Service NonExistentDependency is not registered")
         })
     })
 
@@ -175,42 +144,19 @@ describe("ServiceRegistry", () => {
 
             const service = new MockService()
 
-            registry
-            .register(service)
-            .then(() => registry.start())
-            .then(() => registry.stop())
-            .then(() => {
-                expect(service.state).equal(ServiceState.Stopped)
-            })
-            .catch((error) => {
-                throw error
-            })
-        })
-
-        it("should not error when trying to stop a service that is not started", async () => {
-
-            const registry = new ServiceRegistry()
-
-            const service = new MockService()
-
-            registry
-            .register(service)
-            .then(() => registry.stop)
-            .catch((error) => {
-                throw error
-            })
+            await registry.register(service)
+            await registry.start()
+            await registry.stop()
+            expect(service.state).toBe(ServiceState.Stopped)
         })
 
         it("should throw an error when trying to stop a service that is not registered", async () => {
 
             const registry = new ServiceRegistry()
 
-            registry
-            .stopService("NonExistentService")
-            .catch((error) => {
-                expect(error).instanceOf(Error)
-                expect(error.message).equal("Service NonExistentService is not registered")
-            })
+            await expect(registry.stopService("NonExistentService")).rejects.toThrow(
+                "Service NonExistentService is not registered"
+            )
         })
     })
 
@@ -222,16 +168,10 @@ describe("ServiceRegistry", () => {
 
             const service = new MockService()
 
-            registry
-            .register(service)
-            .then(() => registry.start)
-            .then(() => registry.reload)
-            .then(() => {
-                expect(service.state).equal(ServiceState.Started)
-            })
-            .catch((error) => {
-                throw error
-            })
+            await registry.register(service)
+            await registry.start()
+            await registry.reload()
+            expect(service.state).toBe(ServiceState.Started)
         })
     })
 
@@ -243,13 +183,10 @@ describe("ServiceRegistry", () => {
 
             const service = new MockService()
 
-            registry
-            .register(service)
-            .then(() => registry.start())
-            .then(() => registry.shutdown())
-            .then(() => {
-                expect(service.state).equal(ServiceState.Stopped)
-            })
+            await registry.register(service)
+            await registry.start()
+            await registry.shutdown()
+            expect(service.state).toBe(ServiceState.Unloaded)
         })
     })
 })

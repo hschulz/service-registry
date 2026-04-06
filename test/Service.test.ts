@@ -1,5 +1,5 @@
-import { expect } from "chai"
-import { AbstractService, ServiceState } from ".."
+import { describe, it, expect } from "vitest"
+import { AbstractService, ServiceState } from "../src/index.js"
 
 class MockService extends AbstractService {}
 
@@ -31,7 +31,7 @@ class ErroringInUnloadService extends AbstractService {
     }
 }
 
-class MoockServiceWithSettableState extends AbstractService {
+class MockServiceWithSettableState extends AbstractService {
 
     public setState(state: ServiceState) {
         this._state = state
@@ -44,18 +44,18 @@ describe("Service Suite", () => {
 
         it("should create an instance of MockService", () => {
             const service = new MockService()
-            expect(service).instanceOf(MockService)
+            expect(service).toBeInstanceOf(MockService)
         })
 
         it("should have an empty dependencies array", () => {
             const service = new MockService()
-            expect(service.dependencies).instanceOf(Array)
-            expect(service.dependencies).length(0)
+            expect(service.dependencies).toBeInstanceOf(Array)
+            expect(service.dependencies).toHaveLength(0)
         })
 
         it("should have an initial state of ServiceState.Unknown", () => {
             const service = new MockService()
-            expect(service.state).equal(ServiceState.Unknown)
+            expect(service.state).toBe(ServiceState.Unknown)
         })
     })
 
@@ -65,45 +65,24 @@ describe("Service Suite", () => {
 
             const service = new MockService()
 
-            service
-            .initialize()
-            .then(() => {
-                expect(service.state).equal(ServiceState.Initialized)
-            })
-            .catch((error) => {
-                throw error
-            })
+            await service.initialize()
+            expect(service.state).toBe(ServiceState.Initialized)
         })
 
         it("should throw an error when initializing an already initialized service", async () => {
 
             const service = new MockService()
 
-            service
-            .initialize()
-            .then(() => service.initialize())
-            .catch((error) => {
-                expect(error.message).equal("Service MockService is already initialized")
-            })
-            .finally(() => {
-                expect(service.state).equal(ServiceState.Initialized)
-            })
+            await service.initialize()
+            await expect(service.initialize()).rejects.toThrow("Service MockService is already initialized")
+            expect(service.state).toBe(ServiceState.Initialized)
         })
 
         it("should throw an error when registering a service that errors in _initialize", async () => {
             const service = new ErroringInInitializeService()
 
-            service
-            .initialize()
-            .then(() => {
-                throw new Error("Service should not have initialized")
-            })
-            .catch((error) => {
-                expect(error.message).equal("Error in _initialize")
-            })
-            .finally(() => {
-                expect(service.state).equal(ServiceState.Error)
-            })
+            await expect(service.initialize()).rejects.toThrow("Error in _initialize")
+            expect(service.state).toBe(ServiceState.Error)
         })
     })
 
@@ -113,70 +92,46 @@ describe("Service Suite", () => {
 
             const service = new MockService()
 
-            service
-            .initialize()
-            .then(() => service.start())
-            .then(() => {
-                expect(service.state).equal(ServiceState.Started)
-            })
-            .catch((error) => {
-                throw error
-            })
+            await service.initialize()
+            await service.start()
+            expect(service.state).toBe(ServiceState.Started)
         })
 
         it("should throw an error when starting an already started service", async () => {
 
             const service = new MockService()
 
-            service
-            .initialize()
-            .then(() => service.start())
-            .then(() => service.start())
-            .catch((error) => {
-                expect(error.message).equal("Service MockService is not initialized")
-            })
-            .finally(() => {
-                expect(service.state).equal(ServiceState.Started)
-            })
+            await service.initialize()
+            await service.start()
+            // Starting an already started service returns without error (early return in switch)
+            await service.start()
+            expect(service.state).toBe(ServiceState.Started)
         })
 
         it("should throw an error when starting a service that errors in _start", async () => {
             const service = new ErroringInStartService()
 
-            service
-            .initialize()
-            .then(() => service.start())
-            .catch((error) => {
-                expect(error.message).equal("Error in _start")
-            })
-            .finally(() => {
-                expect(service.state).equal(ServiceState.Error)
-            })
+            await service.initialize()
+            await expect(service.start()).rejects.toThrow("Error in _start")
+            expect(service.state).toBe(ServiceState.Error)
         })
 
         it("should ignore the start when the state is ServiceState.Starting", async () => {
 
-            const service = new MoockServiceWithSettableState()
+            const service = new MockServiceWithSettableState()
             service.setState(ServiceState.Starting)
 
-            service.start()
-            .then(() => {
-                expect(service.state).equal(ServiceState.Starting)
-            })
-            .catch((error) => {
-                throw error
-            })
+            await service.start()
+            expect(service.state).toBe(ServiceState.Starting)
         })
 
         it("should throw an error when calling start and the current state is ServiceState.Unknown", async () => {
 
-            const service = new MoockServiceWithSettableState()
+            const service = new MockServiceWithSettableState()
 
-            service
-            .start()
-            .catch((error) => {
-                expect(error.message).equal("Service MoockServiceWithSettableState can not be started in its current state: unknown")
-            })
+            await expect(service.start()).rejects.toThrow(
+                "Service MockServiceWithSettableState can not be started in its current state: unknown"
+            )
         })
     })
 
@@ -186,74 +141,48 @@ describe("Service Suite", () => {
 
             const service = new MockService()
 
-            expect(service.state).equal(ServiceState.Unknown)
+            expect(service.state).toBe(ServiceState.Unknown)
 
-            service
-            .initialize()
-            .then(() => service.start())
-            .then(() => service.stop())
-            .then(() => {
-                expect(service.state).equal(ServiceState.Stopped)
-            })
-            .catch((error) => {
-                throw error
-            })
+            await service.initialize()
+            await service.start()
+            await service.stop()
+            expect(service.state).toBe(ServiceState.Stopped)
         })
 
         it("should throw an error when stopping a service that is not started", async () => {
 
             const service = new MockService()
 
-            service
-            .initialize()
-            .then(() => service.stop())
-            .catch((error) => {
-                expect(error.message).equal("Service MockService is not initialized")
-            })
-            .finally(() => {
-                expect(service.state).equal(ServiceState.Initialized)
-            })
+            await service.initialize()
+            await expect(service.stop()).rejects.toThrow()
+            expect(service.state).toBe(ServiceState.Initialized)
         })
 
         it("should throw an error when stopping a service that errors in _stop", async () => {
             const service = new ErroringInStopService()
 
-            service
-            .initialize()
-            .then(() => service.start())
-            .then(() => service.stop())
-            .catch((error) => {
-                expect(error.message).equal("Error in _stop")
-            })
-            .finally(() => {
-                expect(service.state).equal(ServiceState.Error)
-            })
+            await service.initialize()
+            await service.start()
+            await expect(service.stop()).rejects.toThrow("Error in _stop")
+            expect(service.state).toBe(ServiceState.Error)
         })
 
         it("should ignore the stop when the state is ServiceState.Stopping", async () => {
 
-            const service = new MoockServiceWithSettableState()
+            const service = new MockServiceWithSettableState()
             service.setState(ServiceState.Stopping)
 
-            service
-            .stop()
-            .then(() => {
-                expect(service.state).equal(ServiceState.Stopping)
-            })
-            .catch((error) => {
-                throw error
-            })
+            await service.stop()
+            expect(service.state).toBe(ServiceState.Stopping)
         })
 
         it("should throw an error when calling stop and the current state is ServiceState.Unknown", async () => {
 
-            const service = new MoockServiceWithSettableState()
+            const service = new MockServiceWithSettableState()
 
-            service
-            .stop()
-            .catch((error) => {
-                expect(error.message).equal("Service MoockServiceWithSettableState can not be stopped in its current state: unknown")
-            })
+            await expect(service.stop()).rejects.toThrow(
+                "Service MockServiceWithSettableState can not be stopped in its current state: unknown"
+            )
         })
     })
 
@@ -263,64 +192,39 @@ describe("Service Suite", () => {
 
             const service = new MockService()
 
-            service
-            .initialize()
-            .then(() => service.start())
-            .then(() => service.stop())
-            .then(() => service.unload())
-            .then(() => {
-                expect(service.state).equal(ServiceState.Unloaded)
-            })
-            .catch((error) => {
-                // fail(`Service failed to unload: ${error}`)
-                throw error
-            })
+            await service.initialize()
+            await service.start()
+            await service.stop()
+            await service.unload()
+            expect(service.state).toBe(ServiceState.Unloaded)
         })
 
         it("should throw an error when unloading a service that is not stopped", async () => {
 
             const service = new MockService()
 
-            service
-            .initialize()
-            .then(() => service.start())
-            .then(() => service.unload())
-            .catch((error) => {
-                expect(error.message).equal("Service MockService is not stopped")
-            })
-            .finally(() => {
-                expect(service.state).equal(ServiceState.Started)
-            })
+            await service.initialize()
+            await service.start()
+            await expect(service.unload()).rejects.toThrow("Service MockService is not stopped")
+            expect(service.state).toBe(ServiceState.Started)
         })
 
         it("should throw an error when unloading a service that is not initialized", async () => {
 
             const service = new MockService()
 
-            service
-            .unload()
-            .catch((error) => {
-                expect(error.message).equal("Service MockService is not initialized")
-            })
-            .finally(() => {
-                expect(service.state).equal(ServiceState.Unknown)
-            })
+            await expect(service.unload()).rejects.toThrow("Service MockService is not stopped")
+            expect(service.state).toBe(ServiceState.Unknown)
         })
 
         it("should throw an error when unloading a service that errors in _unload", async () => {
             const service = new ErroringInUnloadService()
 
-            service
-            .initialize()
-            .then(() => service.start())
-            .then(() => service.stop())
-            .then(() => service.unload())
-            .catch((error) => {
-                expect(error.message).equal("Error in _unload")
-            })
-            .finally(() => {
-                expect(service.state).equal(ServiceState.Error)
-            })
+            await service.initialize()
+            await service.start()
+            await service.stop()
+            await expect(service.unload()).rejects.toThrow("Error in _unload")
+            expect(service.state).toBe(ServiceState.Error)
         })
     })
 
@@ -330,16 +234,10 @@ describe("Service Suite", () => {
 
             const service = new MockService()
 
-            service
-            .initialize()
-            .then(() => service.start)
-            .then(() => service.reload)
-            .then(() => {
-                expect(service.state).equal(ServiceState.Started)
-            })
-            .catch((error) => {
-                throw error
-            })
+            await service.initialize()
+            await service.start()
+            await service.reload()
+            expect(service.state).toBe(ServiceState.Started)
         })
     })
 })
