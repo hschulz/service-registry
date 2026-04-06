@@ -9,6 +9,9 @@ node_modules/
 ### General ###
 *.log
 
+### Build ###
+dist/
+
 ### Testing ###
 coverage/
 test-results.xml
