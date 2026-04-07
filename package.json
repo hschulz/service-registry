@@ -1,6 +1,6 @@
 {
     "name": "@hschulz/service-registry",
-    "version": "0.1.0",
+    "version": "0.3.0",
     "description": "Library for managing modular services.",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
