@@ -248,7 +248,13 @@ export class ServiceRegistry {
      */
     public async start(): Promise<void[]> {
         const sortedServices = this.dag.topologicalSort().reverse()
-        return Promise.all(sortedServices.map(name => this.startService(name)))
+        const results: void[] = []
+
+        for (const name of sortedServices) {
+            results.push(await this.startService(name))
+        }
+
+        return results
     }
 
     /**
@@ -258,7 +264,13 @@ export class ServiceRegistry {
      */
     public async stop(): Promise<void[]> {
         const sortedServices = this.dag.topologicalSort()
-        return Promise.all(sortedServices.map(name => this.stopService(name)))
+        const results: void[] = []
+
+        for (const name of sortedServices) {
+            results.push(await this.stopService(name))
+        }
+
+        return results
     }
 
     /**
@@ -268,7 +280,13 @@ export class ServiceRegistry {
      */
     public async reload(): Promise<void[]> {
         const sortedServices = this.dag.topologicalSort()
-        return Promise.all(sortedServices.map(name => this.reloadService(name)))
+        const results: void[] = []
+
+        for (const name of sortedServices) {
+            results.push(await this.reloadService(name))
+        }
+
+        return results
     }
 
     /**
